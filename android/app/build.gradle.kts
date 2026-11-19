@@ -29,11 +29,30 @@ android {
         versionName = flutter.versionName
     }
 
+    // Firma fija para que las actualizaciones se instalen encima sin perder datos.
+    // En CI el keystore llega desde los secretos del repo; si no está, usa la debug key.
+    val keystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
+    val keystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+    val tieneFirmaRelease = !keystorePath.isNullOrBlank() && !keystorePassword.isNullOrBlank()
+
+    signingConfigs {
+        if (tieneFirmaRelease) {
+            create("release") {
+                storeFile = file(keystorePath!!)
+                storePassword = keystorePassword
+                keyAlias = "facturaspy"
+                keyPassword = keystorePassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (tieneFirmaRelease) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
