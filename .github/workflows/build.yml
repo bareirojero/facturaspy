@@ -6,6 +6,9 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-apk:
     runs-on: ubuntu-latest
@@ -37,8 +40,19 @@ jobs:
         run: flutter build apk --release
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: facturas-py-apk
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
+
+      - name: Publicar APK como Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk facturas-py.apk
+          gh release create "build-${{ github.run_number }}" facturas-py.apk \
+            --target "${{ github.sha }}" \
+            --title "Facturas PY (build ${{ github.run_number }})" \
+            --notes "APK compilado automáticamente desde ${{ github.sha }}." \
+            --latest
