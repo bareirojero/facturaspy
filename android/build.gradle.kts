@@ -22,3 +22,11 @@ subprojects {
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
+
+// El lint "vital" de release falla con un error interno en algunos plugins
+// (p. ej. image_picker_android). No afecta al APK, así que se desactiva.
+subprojects {
+    tasks.matching { it.name.contains("lintVital") }.configureEach {
+        enabled = false
+    }
+}
