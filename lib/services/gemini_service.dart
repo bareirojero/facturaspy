@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -125,6 +126,20 @@ Uint8List _procesarImagenIsolate(Uint8List bytes) {
 
   return Uint8List.fromList(img.encodeJpg(resized, quality: 85));
 }
+
+/// Extrae el mensaje de error que devuelve la API de Google, si lo hay.
+String _mensajeErrorApi(String body) {
+  try {
+    final err = (jsonDecode(body) as Map<String, dynamic>)['error'];
+    if (err is Map && err['message'] is String) return err['message'] as String;
+  } catch (_) {}
+  return body.length > 200 ? '${body.substring(0, 200)}...' : body;
+}
+
+bool _esKeyInvalida(int status, String body) =>
+    status == 401 ||
+    status == 403 ||
+    (status == 400 && body.contains('API_KEY_INVALID'));
 
 class GeminiService {
   static final GeminiService instance = GeminiService._init();
@@ -277,7 +292,11 @@ Reglas importantes:
             },
             body: body,
           )
-          .timeout(const Duration(seconds: 60));
+          .timeout(const Duration(seconds: 120));
+    } on TimeoutException {
+      throw GeminiException(
+        'Gemini tardó demasiado en responder. Probá de nuevo o completá los datos a mano.',
+      );
     } on SocketException {
       throw GeminiException(
         'Sin conexión a internet. Verificá tu red o completá la factura manualmente.',
@@ -292,7 +311,7 @@ Reglas importantes:
       );
     }
 
-    if (response.statusCode == 401 || response.statusCode == 403) {
+    if (_esKeyInvalida(response.statusCode, response.body)) {
       throw GeminiException(
         'API Key inválida o sin permisos (HTTP ${response.statusCode}). Revisala en Ajustes.',
         statusCode: response.statusCode,
@@ -308,7 +327,7 @@ Reglas importantes:
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw GeminiException(
-        'Error del servidor Gemini (HTTP ${response.statusCode}).',
+        'Error de Gemini (HTTP ${response.statusCode}): ${_mensajeErrorApi(response.body)}',
         statusCode: response.statusCode,
       );
     }
@@ -342,7 +361,8 @@ Reglas importantes:
     }
   }
 
-  /// Prueba rápida de conectividad y validez de API Key / Modelo
+  /// Prueba rápida: consulta los datos del modelo (no genera texto, así que
+  /// responde en menos de un segundo) y valida la API Key y el nombre del modelo.
   Future<String> probarConexion({
     required String apiKey,
     required String model,
@@ -355,50 +375,45 @@ Reglas importantes:
     }
 
     final uri = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/models/$cleanModel:generateContent',
+      'https://generativelanguage.googleapis.com/v1beta/models/$cleanModel',
     );
 
-    final body = jsonEncode({
-      'contents': [
-        {
-          'parts': [
-            {'text': 'Respondé únicamente con la palabra: OK'}
-          ]
-        }
-      ],
-      'generationConfig': {
-        'maxOutputTokens': 10,
-      }
-    });
-
+    http.Response response;
     try {
-      final response = await http
-          .post(
-            uri,
-            headers: {
-              'Content-Type': 'application/json',
-              'x-goog-api-key': cleanKey,
-            },
-            body: body,
-          )
+      response = await http
+          .get(uri, headers: {'x-goog-api-key': cleanKey})
           .timeout(const Duration(seconds: 20));
-
-      if (response.statusCode == 200) {
-        return 'Conexión exitosa con $cleanModel.';
-      } else if (response.statusCode == 401 || response.statusCode == 403) {
-        throw GeminiException('API Key inválida o sin autorización (${response.statusCode}).');
-      } else if (response.statusCode == 404) {
-        throw GeminiException('El modelo "$cleanModel" no existe o no está disponible (404).');
-      } else if (response.statusCode == 429) {
-        throw GeminiException('Límite de cuota excedido (429). La API Key es válida.');
-      } else {
-        throw GeminiException('Error HTTP ${response.statusCode}: ${response.body}');
-      }
+    } on TimeoutException {
+      throw GeminiException(
+        'No hubo respuesta de Google en 20 segundos. Revisá tu conexión a internet.',
+      );
     } on SocketException {
       throw GeminiException('Sin conexión a internet.');
     } catch (e) {
-      if (e is GeminiException) rethrow;
       throw GeminiException('Error de conexión: $e');
     }
+
+    if (response.statusCode == 200) {
+      String nombre = cleanModel;
+      try {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        nombre = (data['displayName'] as String?) ?? cleanModel;
+      } catch (_) {}
+      return 'Conexión exitosa. API Key válida y modelo disponible: $nombre.';
+    }
+    if (_esKeyInvalida(response.statusCode, response.body)) {
+      throw GeminiException(
+        'API Key inválida. Verificá que la copiaste completa desde Google AI Studio.',
+      );
+    }
+    if (response.statusCode == 404) {
+      throw GeminiException('El modelo "$cleanModel" no existe o no está disponible.');
+    }
+    if (response.statusCode == 429) {
+      throw GeminiException('Límite de uso alcanzado (429). La API Key es válida; probá más tarde.');
+    }
+    throw GeminiException(
+      'Error HTTP ${response.statusCode}: ${_mensajeErrorApi(response.body)}',
+    );
   }
 }
