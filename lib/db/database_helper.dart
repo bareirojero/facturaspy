@@ -22,8 +22,9 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _createDB,
+      onUpgrade: _upgradeDB,
     );
   }
 
@@ -46,9 +47,52 @@ class DatabaseHelper {
         categoria TEXT NOT NULL,
         notas TEXT NOT NULL,
         imagen_path TEXT NOT NULL,
-        creado_en TEXT NOT NULL
+        creado_en TEXT NOT NULL,
+        estado TEXT NOT NULL DEFAULT 'revisada',
+        error_extraccion TEXT
       )
     ''');
+  }
+
+  Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute(
+        "ALTER TABLE facturas ADD COLUMN estado TEXT NOT NULL DEFAULT 'revisada'",
+      );
+      await db.execute('ALTER TABLE facturas ADD COLUMN error_extraccion TEXT');
+    }
+  }
+
+  Future<Factura?> getFactura(int id) async {
+    final db = await database;
+    final rows = await db.query('facturas', where: 'id = ?', whereArgs: [id]);
+    return rows.isEmpty ? null : Factura.fromMap(rows.first);
+  }
+
+  /// Facturas que todavía no fueron confirmadas (leyéndose o por revisar),
+  /// de cualquier mes.
+  Future<List<Factura>> getPendientes() async {
+    final db = await database;
+    final rows = await db.query(
+      'facturas',
+      where: 'estado != ?',
+      whereArgs: ['revisada'],
+      orderBy: 'creado_en ASC, id ASC',
+    );
+    return rows.map((m) => Factura.fromMap(m)).toList();
+  }
+
+  /// IDs que quedaron a medio leer (p. ej. si se cerró la app).
+  Future<List<int>> getIdsProcesando() async {
+    final db = await database;
+    final rows = await db.query(
+      'facturas',
+      columns: ['id'],
+      where: 'estado = ?',
+      whereArgs: ['procesando'],
+      orderBy: 'id ASC',
+    );
+    return rows.map((m) => m['id'] as int).toList();
   }
 
   Future<int> insertFactura(Factura factura) async {
@@ -88,8 +132,8 @@ class DatabaseHelper {
     final prefix = '$year-${month.toString().padLeft(2, '0')}';
     final result = await db.query(
       'facturas',
-      where: 'fecha LIKE ?',
-      whereArgs: ['$prefix%'],
+      where: 'fecha LIKE ? AND estado = ?',
+      whereArgs: ['$prefix%', 'revisada'],
       orderBy: 'fecha DESC, id DESC',
     );
     return result.map((map) => Factura.fromMap(map)).toList();

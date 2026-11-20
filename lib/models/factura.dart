@@ -1,3 +1,10 @@
+/// Estados de una factura dentro de la app.
+class EstadoFactura {
+  static const procesando = 'procesando'; // Gemini la está leyendo
+  static const porRevisar = 'por_revisar'; // leída, falta confirmar
+  static const revisada = 'revisada'; // confirmada por el usuario
+}
+
 class Factura {
   final int? id;
   final String fecha; // ISO yyyy-MM-dd
@@ -16,6 +23,8 @@ class Factura {
   final String notas;
   final String imagenPath;
   final String creadoEn; // ISO
+  final String estado; // ver EstadoFactura
+  final String? errorExtraccion; // mensaje si Gemini no pudo leerla
 
   static const List<String> categoriasDefecto = [
     'Combustible',
@@ -46,7 +55,36 @@ class Factura {
     required this.notas,
     required this.imagenPath,
     required this.creadoEn,
+    this.estado = EstadoFactura.revisada,
+    this.errorExtraccion,
   });
+
+  /// Factura recién fotografiada, sin datos, esperando a Gemini.
+  factory Factura.borrador({required String imagenPath}) {
+    final ahora = DateTime.now();
+    return Factura(
+      fecha: ahora.toIso8601String().substring(0, 10),
+      rucEmisor: '',
+      razonSocial: '',
+      timbrado: '',
+      numeroFactura: '',
+      condicion: 'contado',
+      gravada10: 0,
+      gravada5: 0,
+      exenta: 0,
+      iva10: 0,
+      iva5: 0,
+      total: 0,
+      categoria: categoriasDefecto.first,
+      notas: '',
+      imagenPath: imagenPath,
+      creadoEn: ahora.toIso8601String(),
+      estado: EstadoFactura.procesando,
+    );
+  }
+
+  bool get estaProcesando => estado == EstadoFactura.procesando;
+  bool get estaPorRevisar => estado == EstadoFactura.porRevisar;
 
   bool get tieneDiscrepanciaMontos {
     final suma = gravada10 + gravada5 + exenta;
@@ -71,6 +109,9 @@ class Factura {
     String? notas,
     String? imagenPath,
     String? creadoEn,
+    String? estado,
+    String? errorExtraccion,
+    bool limpiarError = false,
   }) {
     return Factura(
       id: id ?? this.id,
@@ -90,6 +131,9 @@ class Factura {
       notas: notas ?? this.notas,
       imagenPath: imagenPath ?? this.imagenPath,
       creadoEn: creadoEn ?? this.creadoEn,
+      estado: estado ?? this.estado,
+      errorExtraccion:
+          limpiarError ? null : (errorExtraccion ?? this.errorExtraccion),
     );
   }
 
@@ -112,6 +156,8 @@ class Factura {
       'notas': notas,
       'imagen_path': imagenPath,
       'creado_en': creadoEn,
+      'estado': estado,
+      'error_extraccion': errorExtraccion,
     };
   }
 
@@ -134,6 +180,8 @@ class Factura {
       notas: (map['notas'] as String?) ?? '',
       imagenPath: (map['imagen_path'] as String?) ?? '',
       creadoEn: (map['creado_en'] as String?) ?? DateTime.now().toIso8601String(),
+      estado: (map['estado'] as String?) ?? EstadoFactura.revisada,
+      errorExtraccion: map['error_extraccion'] as String?,
     );
   }
 }

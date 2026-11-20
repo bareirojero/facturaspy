@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'screens/home_screen.dart';
+import 'services/cola_procesamiento.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('es', null);
   runApp(const FacturasPyApp());
+  // Retomar facturas que quedaron a medio leer si se cerró la app.
+  ColaProcesamiento.instance.reanudarPendientes();
 }
 
 class FacturasPyApp extends StatelessWidget {

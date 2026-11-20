@@ -152,6 +152,8 @@ class _FacturaFormScreenState extends State<FacturaFormScreen> {
         notas: _notasCtrl.text.trim(),
         imagenPath: widget.facturaInicial.imagenPath,
         creadoEn: widget.facturaInicial.creadoEn,
+        estado: EstadoFactura.revisada,
+        errorExtraccion: null,
       );
 
       if (widget.esNueva) {
@@ -173,20 +175,22 @@ class _FacturaFormScreenState extends State<FacturaFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final error = widget.errorExtraccion ?? widget.facturaInicial.errorExtraccion;
+    final porRevisar = widget.esNueva || widget.facturaInicial.estaPorRevisar;
     final imageFile = File(widget.facturaInicial.imagenPath);
     final tieneImagen =
         widget.facturaInicial.imagenPath.isNotEmpty && imageFile.existsSync();
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.esNueva ? 'Revisar Factura' : 'Editar Factura'),
+        title: Text(porRevisar ? 'Revisar Factura' : 'Editar Factura'),
       ),
       body: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            if (widget.errorExtraccion != null) ...[
+            if (error != null) ...[
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -203,7 +207,7 @@ class _FacturaFormScreenState extends State<FacturaFormScreen> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        '${widget.errorExtraccion}\nPodés completar los campos manualmente.',
+                        '$error\nPodés completar los campos manualmente.',
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.onErrorContainer,
                           fontSize: 13,
@@ -527,7 +531,7 @@ class _FacturaFormScreenState extends State<FacturaFormScreen> {
                   : const Icon(Icons.save),
               label: const Padding(
                 padding: EdgeInsets.symmetric(vertical: 14),
-                child: Text('Guardar Factura', style: TextStyle(fontSize: 16)),
+                child: Text('Confirmar y guardar', style: TextStyle(fontSize: 16)),
               ),
             ),
             const SizedBox(height: 24),

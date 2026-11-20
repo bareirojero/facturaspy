@@ -1,0 +1,116 @@
+import 'package:flutter/foundation.dart';
+import '../db/database_helper.dart';
+import '../models/factura.dart';
+import 'gemini_service.dart';
+
+/// Cola que envía las fotos a Gemini de a una, en segundo plano, mientras
+/// el usuario sigue sacando fotos. Notifica a la UI cada vez que cambia algo.
+class ColaProcesamiento extends ChangeNotifier {
+  static final ColaProcesamiento instance = ColaProcesamiento._();
+  ColaProcesamiento._();
+
+  final List<int> _cola = [];
+  bool _trabajando = false;
+
+  /// Cantidad de facturas que faltan leer (incluida la que se está leyendo).
+  int get pendientes => _cola.length;
+
+  /// Guarda la foto, crea la factura en estado "procesando" y la encola.
+  Future<void> agregarFoto(String tempPath) async {
+    final db = DatabaseHelper.instance;
+    String path = tempPath;
+    try {
+      path = await db.guardarImagenLocal(tempPath);
+    } catch (_) {}
+    final id = await db.insertFactura(Factura.borrador(imagenPath: path));
+    _cola.add(id);
+    notifyListeners();
+    _procesar();
+  }
+
+  /// Vuelve a encolar facturas que quedaron a medio leer al cerrar la app.
+  Future<void> reanudarPendientes() async {
+    final ids = await DatabaseHelper.instance.getIdsProcesando();
+    for (final id in ids) {
+      if (!_cola.contains(id)) _cola.add(id);
+    }
+    if (ids.isNotEmpty) notifyListeners();
+    _procesar();
+  }
+
+  /// Saca una factura de la cola (p. ej. si el usuario la borra).
+  void quitar(int id) {
+    // La que se está leyendo ahora no se quita; al terminar se descarta sola
+    // porque ya no existe en la base.
+    final enCurso = _trabajando && _cola.isNotEmpty ? _cola.first : null;
+    if (id != enCurso) _cola.remove(id);
+    notifyListeners();
+  }
+
+  Future<void> _procesar() async {
+    if (_trabajando) return;
+    _trabajando = true;
+    final db = DatabaseHelper.instance;
+
+    while (_cola.isNotEmpty) {
+      final id = _cola.first;
+      try {
+        final f = await db.getFactura(id);
+        if (f != null && f.estaProcesando) {
+          final actualizada = await _leerConReintentos(f);
+          // Pudo haberse borrado mientras Gemini la leía.
+          if (await db.getFactura(id) != null) {
+            await db.updateFactura(actualizada);
+          }
+        }
+      } catch (_) {
+        // Nunca dejar la cola trabada por un error inesperado.
+      }
+      _cola.remove(id);
+      notifyListeners();
+    }
+
+    _trabajando = false;
+    notifyListeners();
+  }
+
+  /// Llama a Gemini; si responde 429 (límite por minuto), espera y reintenta.
+  Future<Factura> _leerConReintentos(Factura f) async {
+    const esperas = [Duration(seconds: 20), Duration(seconds: 45)];
+    for (int intento = 0;; intento++) {
+      try {
+        final r = await GeminiService.instance.extraerDatosFactura(f.imagenPath);
+        return f.copyWith(
+          fecha: r.fecha ?? f.fecha,
+          rucEmisor: r.rucEmisor ?? '',
+          razonSocial: r.razonSocial ?? '',
+          timbrado: r.timbrado ?? '',
+          numeroFactura: r.numeroFactura ?? '',
+          condicion: r.condicion ?? 'contado',
+          gravada10: r.gravada10,
+          gravada5: r.gravada5,
+          exenta: r.exenta,
+          iva10: r.iva10,
+          iva5: r.iva5,
+          total: r.total,
+          estado: EstadoFactura.porRevisar,
+          limpiarError: true,
+        );
+      } on GeminiException catch (e) {
+        if (e.statusCode == 429 && intento < esperas.length) {
+          await Future.delayed(esperas[intento]);
+          continue;
+        }
+        return f.copyWith(
+          estado: EstadoFactura.porRevisar,
+          errorExtraccion: e.message,
+        );
+      } catch (e) {
+        return f.copyWith(
+          estado: EstadoFactura.porRevisar,
+          errorExtraccion: 'Error inesperado: $e',
+        );
+      }
+    }
+  }
+}
