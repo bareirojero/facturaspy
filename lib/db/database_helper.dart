@@ -139,6 +139,18 @@ class DatabaseHelper {
     return result.map((map) => Factura.fromMap(map)).toList();
   }
 
+  /// Facturas confirmadas de todo un año.
+  Future<List<Factura>> getFacturasPorAnio(int year) async {
+    final db = await database;
+    final result = await db.query(
+      'facturas',
+      where: 'fecha LIKE ? AND estado = ?',
+      whereArgs: ['$year-%', 'revisada'],
+      orderBy: 'fecha ASC, id ASC',
+    );
+    return result.map((map) => Factura.fromMap(map)).toList();
+  }
+
   /// Guarda una copia persistente de la imagen en el directorio privado de la app
   Future<String> guardarImagenLocal(String sourcePath) async {
     final appDir = await getApplicationDocumentsDirectory();

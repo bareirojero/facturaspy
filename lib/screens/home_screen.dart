@@ -10,6 +10,7 @@ import '../services/pdf_service.dart';
 import '../utils/formatters.dart';
 import 'ajustes_screen.dart';
 import 'factura_form_screen.dart';
+import 'resumen_anual_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -303,6 +304,21 @@ class _HomeScreenState extends State<HomeScreen> {
     _cargarFacturas();
   }
 
+  Future<void> _abrirResumenAnual() async {
+    final mes = await Navigator.of(context).push<DateTime>(
+      MaterialPageRoute(
+        builder: (_) => ResumenAnualScreen(yearInicial: _selectedYear),
+      ),
+    );
+    if (mes == null || !mounted) return;
+    setState(() {
+      _selectedYear = mes.year;
+      _selectedMonth = mes.month;
+      _cargando = true;
+    });
+    _cargarFacturas();
+  }
+
   Future<void> _abrirFactura(Factura f) async {
     if (f.estaProcesando) {
       _mostrarMensaje('Todavía se está leyendo esta factura. Esperá unos segundos.');
@@ -367,10 +383,14 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     } else if (f.errorExtraccion != null) {
       subtitulo = Text(
-        'No se pudo leer. Tocá para cargarla a mano.',
+        'No se pudo leer. Reintentá o tocá para cargarla a mano.',
         style: TextStyle(color: scheme.error),
       );
-      trailing = Icon(Icons.error_outline, color: scheme.error);
+      trailing = FilledButton.tonalIcon(
+        onPressed: () => _cola.reintentar(f),
+        icon: const Icon(Icons.refresh, size: 18),
+        label: const Text('Reintentar'),
+      );
     } else {
       subtitulo = Text(
         '${AppFormatters.formatFechaCorta(f.fecha)}  •  ${AppFormatters.formatGuaranies(f.total)}',
@@ -529,6 +549,11 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('Facturas PY'),
         actions: [
+          IconButton(
+            tooltip: 'Resumen anual',
+            icon: const Icon(Icons.bar_chart),
+            onPressed: _abrirResumenAnual,
+          ),
           IconButton(
             tooltip: 'Generar PDF mensual',
             onPressed: _generandoPdf ? null : _generarPdf,

@@ -29,6 +29,17 @@ class ColaProcesamiento extends ChangeNotifier {
     _procesar();
   }
 
+  /// Manda de nuevo una factura existente a Gemini (descarta lo leído antes).
+  Future<void> reintentar(Factura f) async {
+    if (f.id == null) return;
+    await DatabaseHelper.instance.updateFactura(
+      f.copyWith(estado: EstadoFactura.procesando, limpiarError: true),
+    );
+    if (!_cola.contains(f.id)) _cola.add(f.id!);
+    notifyListeners();
+    _procesar();
+  }
+
   /// Vuelve a encolar facturas que quedaron a medio leer al cerrar la app.
   Future<void> reanudarPendientes() async {
     final ids = await DatabaseHelper.instance.getIdsProcesando();

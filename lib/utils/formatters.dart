@@ -13,6 +13,22 @@ class AppFormatters {
     return '${_guaraniFormat.format(valor)} Gs.';
   }
 
+  /// Formato corto para ejes y etiquetas: 1250000 -> "1,3 M", 85000 -> "85 mil".
+  static String formatCompacto(int valor) {
+    if (valor >= 1000000) {
+      final m = valor / 1000000;
+      return '${NumberFormat(m >= 10 ? '#0' : '#0.#', 'es').format(m)} M';
+    }
+    if (valor >= 1000) return '${(valor / 1000).round()} mil';
+    return valor.toString();
+  }
+
+  /// Nombre del mes capitalizado: 3 -> "Marzo".
+  static String nombreMes(int month) {
+    final raw = DateFormat('MMMM', 'es').format(DateTime(2000, month, 1));
+    return raw.isEmpty ? raw : raw[0].toUpperCase() + raw.substring(1);
+  }
+
   /// Parsea texto con puntos o espacios a int: "1.250.000" -> 1250000
   static int parseGuaranies(String texto) {
     final limpio = texto.replaceAll(RegExp(r'[^0-9-]'), '');

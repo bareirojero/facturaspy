@@ -174,6 +174,34 @@ class _FacturaFormScreenState extends State<FacturaFormScreen> {
     }
   }
 
+  Future<void> _releer() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.auto_awesome),
+        title: const Text('Volver a leer con Gemini'),
+        content: const Text(
+          'Gemini va a leer la foto de nuevo y la factura pasa a "Por revisar". '
+          'Los datos que cargaste o corregiste se reemplazan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Volver a leer'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await ColaProcesamiento.instance.reintentar(widget.facturaInicial);
+    if (!mounted) return;
+    Navigator.of(context).pop(true);
+  }
+
   Future<void> _eliminar() async {
     final ok = await showDialog<bool>(
       context: context,
@@ -215,6 +243,13 @@ class _FacturaFormScreenState extends State<FacturaFormScreen> {
       appBar: AppBar(
         title: Text(porRevisar ? 'Revisar Factura' : 'Editar Factura'),
         actions: [
+          if (widget.facturaInicial.id != null &&
+              widget.facturaInicial.imagenPath.isNotEmpty)
+            IconButton(
+              tooltip: 'Volver a leer con Gemini',
+              icon: const Icon(Icons.auto_awesome),
+              onPressed: _guardando ? null : _releer,
+            ),
           if (widget.facturaInicial.id != null)
             IconButton(
               tooltip: 'Eliminar factura',
