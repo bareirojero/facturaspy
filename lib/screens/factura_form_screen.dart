@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../db/database_helper.dart';
 import '../models/factura.dart';
+import '../services/cola_procesamiento.dart';
 import '../utils/formatters.dart';
 import '../widgets/imagen_zoom_dialog.dart';
 
@@ -173,6 +174,35 @@ class _FacturaFormScreenState extends State<FacturaFormScreen> {
     }
   }
 
+  Future<void> _eliminar() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar factura'),
+        content: const Text('Se borra la factura y su foto. No se puede deshacer.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final f = widget.facturaInicial;
+    await DatabaseHelper.instance.deleteFactura(f.id!, imagenPath: f.imagenPath);
+    ColaProcesamiento.instance.quitar(f.id!);
+    if (!mounted) return;
+    Navigator.of(context).pop(true);
+  }
+
   @override
   Widget build(BuildContext context) {
     final error = widget.errorExtraccion ?? widget.facturaInicial.errorExtraccion;
@@ -184,6 +214,14 @@ class _FacturaFormScreenState extends State<FacturaFormScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(porRevisar ? 'Revisar Factura' : 'Editar Factura'),
+        actions: [
+          if (widget.facturaInicial.id != null)
+            IconButton(
+              tooltip: 'Eliminar factura',
+              icon: const Icon(Icons.delete_outline),
+              onPressed: _guardando ? null : _eliminar,
+            ),
+        ],
       ),
       body: Form(
         key: _formKey,

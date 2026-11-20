@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
+import 'package:cunning_document_scanner/cunning_document_scanner.dart';
 import 'package:image_picker/image_picker.dart';
 import '../db/database_helper.dart';
 import '../models/factura.dart';
@@ -67,21 +67,17 @@ class _HomeScreenState extends State<HomeScreen> {
     _cargarFacturas();
   }
 
-  /// Escáner de documentos de Google (ML Kit): detecta los bordes solo,
-  /// permite ajustar las esquinas a mano, rotar y escanear varias facturas
-  /// seguidas. Funciona en el teléfono, sin internet ni costo.
+  /// Escáner con recorte de bordes. Usa el escáner de Google si el teléfono
+  /// lo tiene; si no, abre un recortador de código abierto donde se ajustan
+  /// las esquinas a mano. Permite escanear varias facturas seguidas.
   Future<void> _escanear() async {
-    final scanner = DocumentScanner(
-      options: DocumentScannerOptions(
-        documentFormats: const {DocumentFormat.jpeg},
-        pageLimit: 30,
-        mode: ScannerMode.full,
-        isGalleryImport: true,
-      ),
-    );
     try {
-      final resultado = await scanner.scanDocument();
-      final paginas = resultado.images ?? const <String>[];
+      final resultado = await CunningDocumentScanner.scanDocuments(
+        noOfPages: 30,
+        scannerSource: ScannerSource.cameraAndGallery,
+        androidScannerMode: AndroidScannerMode.full,
+      );
+      final paginas = resultado?.images ?? const <String>[];
       for (final path in paginas) {
         await _cola.agregarFoto(path);
       }
@@ -92,15 +88,18 @@ class _HomeScreenState extends State<HomeScreen> {
               : '${paginas.length} facturas en proceso. Aparecerán en "Por revisar".',
         );
       }
-    } on PlatformException catch (e) {
-      if ((e.message ?? '').toLowerCase().contains('cancel')) return;
+    } on CunningDocumentScannerException catch (e) {
       _mostrarMensaje(
-        'No se pudo abrir el escáner (${e.message}). Probá con "Foto simple".',
+        e.code == 'permission_denied'
+            ? 'Hace falta permiso de cámara para escanear.'
+            : 'No se pudo abrir el escáner (${e.code ?? 'error'}: ${e.message}). Probá con "Foto simple".',
+      );
+    } on PlatformException catch (e) {
+      _mostrarMensaje(
+        'No se pudo abrir el escáner (${e.code}: ${e.message ?? e.details ?? 'sin detalle'}). Probá con "Foto simple".',
       );
     } catch (e) {
       _mostrarMensaje('No se pudo abrir el escáner: $e. Probá con "Foto simple".');
-    } finally {
-      scanner.close();
     }
   }
 
@@ -296,8 +295,10 @@ class _HomeScreenState extends State<HomeScreen> {
       _pendientes.removeWhere((x) => x.id == f.id);
     });
     if (f.id != null) {
-      _cola.quitar(f.id!);
+      // Primero borrar de la base y recién después avisar a la cola, que
+      // dispara una recarga de la lista.
       await DatabaseHelper.instance.deleteFactura(f.id!, imagenPath: f.imagenPath);
+      _cola.quitar(f.id!);
     }
     _cargarFacturas();
   }
@@ -313,6 +314,13 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
     if (cambio == true) _cargarFacturas();
+  }
+
+  Future<void> _borrarConConfirmacion(Factura f) async {
+    if (await _confirmarEliminacion(f) == true) {
+      await _eliminar(f);
+      _mostrarMensaje('Factura eliminada.');
+    }
   }
 
   Widget _envolverDismissible(Factura f, Widget child) {
@@ -377,6 +385,7 @@ class _HomeScreenState extends State<HomeScreen> {
       f,
       ListTile(
         onTap: () => _abrirFactura(f),
+        onLongPress: () => _borrarConConfirmacion(f),
         leading: _miniatura(f),
         title: Text(
           f.estaProcesando
@@ -397,6 +406,7 @@ class _HomeScreenState extends State<HomeScreen> {
       f,
       ListTile(
         onTap: () => _abrirFactura(f),
+        onLongPress: () => _borrarConConfirmacion(f),
         leading: CircleAvatar(
           child: Text(f.categoria.isNotEmpty ? f.categoria[0].toUpperCase() : 'F'),
         ),
