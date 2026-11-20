@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
 import 'package:image_picker/image_picker.dart';
 import '../db/database_helper.dart';
 import '../models/factura.dart';
@@ -63,6 +65,43 @@ class _HomeScreenState extends State<HomeScreen> {
       _cargando = true;
     });
     _cargarFacturas();
+  }
+
+  /// Escáner de documentos de Google (ML Kit): detecta los bordes solo,
+  /// permite ajustar las esquinas a mano, rotar y escanear varias facturas
+  /// seguidas. Funciona en el teléfono, sin internet ni costo.
+  Future<void> _escanear() async {
+    final scanner = DocumentScanner(
+      options: DocumentScannerOptions(
+        documentFormats: const {DocumentFormat.jpeg},
+        pageLimit: 30,
+        mode: ScannerMode.full,
+        isGalleryImport: true,
+      ),
+    );
+    try {
+      final resultado = await scanner.scanDocument();
+      final paginas = resultado.images ?? const <String>[];
+      for (final path in paginas) {
+        await _cola.agregarFoto(path);
+      }
+      if (paginas.isNotEmpty) {
+        _mostrarMensaje(
+          paginas.length == 1
+              ? 'Factura en proceso. Aparecerá en "Por revisar".'
+              : '${paginas.length} facturas en proceso. Aparecerán en "Por revisar".',
+        );
+      }
+    } on PlatformException catch (e) {
+      if ((e.message ?? '').toLowerCase().contains('cancel')) return;
+      _mostrarMensaje(
+        'No se pudo abrir el escáner (${e.message}). Probá con "Foto simple".',
+      );
+    } catch (e) {
+      _mostrarMensaje('No se pudo abrir el escáner: $e. Probá con "Foto simple".');
+    } finally {
+      scanner.close();
+    }
   }
 
   /// Abre la cámara una y otra vez hasta que el usuario cancela.
@@ -146,9 +185,18 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
+              leading: const Icon(Icons.document_scanner),
+              title: const Text('Escanear facturas'),
+              subtitle: const Text('Recorta los bordes solo. Varias seguidas.'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _escanear();
+              },
+            ),
+            ListTile(
               leading: const Icon(Icons.camera_alt),
-              title: const Text('Sacar fotos'),
-              subtitle: const Text('Podés sacar varias seguidas'),
+              title: const Text('Foto simple'),
+              subtitle: const Text('Sin recorte, por si el escáner falla'),
               onTap: () {
                 Navigator.pop(ctx);
                 _sacarFotos();

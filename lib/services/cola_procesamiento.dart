@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../db/database_helper.dart';
 import '../models/factura.dart';
+import 'ekuatia_qr.dart';
 import 'gemini_service.dart';
 
 /// Cola que envía las fotos a Gemini de a una, en segundo plano, mientras
@@ -74,13 +75,15 @@ class ColaProcesamiento extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Llama a Gemini; si responde 429 (límite por minuto), espera y reintenta.
+  /// Lee el QR (si es factura electrónica) y llama a Gemini; si Gemini
+  /// responde 429 (límite por minuto), espera y reintenta.
   Future<Factura> _leerConReintentos(Factura f) async {
+    final qr = await EkuatiaQr.leerDeImagen(f.imagenPath);
     const esperas = [Duration(seconds: 20), Duration(seconds: 45)];
     for (int intento = 0;; intento++) {
       try {
         final r = await GeminiService.instance.extraerDatosFactura(f.imagenPath);
-        return f.copyWith(
+        final leida = f.copyWith(
           fecha: r.fecha ?? f.fecha,
           rucEmisor: r.rucEmisor ?? '',
           razonSocial: r.razonSocial ?? '',
@@ -96,21 +99,42 @@ class ColaProcesamiento extends ChangeNotifier {
           estado: EstadoFactura.porRevisar,
           limpiarError: true,
         );
+        return _aplicarQr(leida, qr);
       } on GeminiException catch (e) {
         if (e.statusCode == 429 && intento < esperas.length) {
           await Future.delayed(esperas[intento]);
           continue;
         }
-        return f.copyWith(
-          estado: EstadoFactura.porRevisar,
-          errorExtraccion: e.message,
-        );
+        return _fallo(f, qr, e.message);
       } catch (e) {
-        return f.copyWith(
-          estado: EstadoFactura.porRevisar,
-          errorExtraccion: 'Error inesperado: $e',
-        );
+        return _fallo(f, qr, 'Error inesperado: $e');
       }
     }
+  }
+
+  /// Los datos del QR son exactos: reemplazan lo que haya leído Gemini.
+  Factura _aplicarQr(Factura f, DatosQrEkuatia? qr) {
+    if (qr == null) return f;
+    final notaCdc = 'CDC: ${qr.cdc}';
+    return f.copyWith(
+      rucEmisor: qr.rucEmisor,
+      numeroFactura: qr.numeroFactura,
+      fecha: qr.fecha,
+      total: qr.total ?? f.total,
+      notas: f.notas.contains(qr.cdc)
+          ? f.notas
+          : (f.notas.isEmpty ? notaCdc : '${f.notas}\n$notaCdc'),
+    );
+  }
+
+  Factura _fallo(Factura f, DatosQrEkuatia? qr, String mensaje) {
+    if (qr != null) {
+      return _aplicarQr(f, qr).copyWith(
+        estado: EstadoFactura.porRevisar,
+        errorExtraccion: '$mensaje\nDel QR se completaron RUC, número, fecha'
+            '${qr.total != null ? ' y total' : ''}. Falta el resto.',
+      );
+    }
+    return f.copyWith(estado: EstadoFactura.porRevisar, errorExtraccion: mensaje);
   }
 }
