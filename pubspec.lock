@@ -2,7 +2,7 @@
 # See https://dart.dev/tools/pub/glossary#lockfile
 packages:
   archive:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: archive
       sha256: "2fda90592c0afd219c5e285618a98da835cd10df38372666093d25dfe457a2d0"
@@ -129,6 +129,30 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "7.0.1"
+  file_selector:
+    dependency: "direct main"
+    description:
+      name: file_selector
+      sha256: bd15e43e9268db636b53eeaca9f56324d1622af30e5c34d6e267649758c84d9a
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.0"
+  file_selector_android:
+    dependency: transitive
+    description:
+      name: file_selector_android
+      sha256: d670cd0ce77a2e785b18d8b4d0a8d6a222d6a813ec9b7ddf2790a1b4fb6fa92c
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.5.2+11"
+  file_selector_ios:
+    dependency: transitive
+    description:
+      name: file_selector_ios
+      sha256: "5b42ec0ef7626124b4624ea244341e9df780406793c204e89fa68a2e71af115c"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.5.3+7"
   file_selector_linux:
     dependency: transitive
     description:
@@ -153,6 +177,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.7.0"
+  file_selector_web:
+    dependency: transitive
+    description:
+      name: file_selector_web
+      sha256: "73181fbc5257776d8ecaa6a94ab3c8e920ad143b9132a6d984a9271dfc6928d3"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.9.5"
   file_selector_windows:
     dependency: transitive
     description:
@@ -253,6 +285,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  glob:
+    dependency: transitive
+    description:
+      name: glob
+      sha256: "218aeb56050c714f62a3182775320dfa04602b55074873e24e31bbd39bda96fb"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.2.0"
   google_mlkit_barcode_scanning:
     dependency: "direct main"
     description:
@@ -485,6 +525,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.0"
+  native_toolchain_c:
+    dependency: transitive
+    description:
+      name: native_toolchain_c
+      sha256: "120b6fc66acd8a5ddeaeb1e59b78836bb3ec9919bd9d9dfb1e2401985710c2c0"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.19.6"
   objective_c:
     dependency: transitive
     description:
@@ -621,6 +669,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.15.1"
+  process:
+    dependency: transitive
+    description:
+      name: process
+      sha256: "4242ba3508d37e01808bdf71ad1d5bb93a8d671bf2e7450e6b1b353fb0808891"
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.0.6"
   pub_semver:
     dependency: transitive
     description:
@@ -698,6 +754,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.5.17"
+  sqflite_common_ffi:
+    dependency: "direct dev"
+    description:
+      name: sqflite_common_ffi
+      sha256: "9aad7a63bb8de6fe4c1e5367e8dcd8dfc89d491f44a526edf8e58a5a1fb1feed"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.4.7"
   sqflite_darwin:
     dependency: transitive
     description:
@@ -714,6 +778,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.4.4"
+  sqlite3:
+    dependency: transitive
+    description:
+      name: sqlite3
+      sha256: "1ae2e821614e7b69628ecb64273e8bc5401b14ab166ee7ea0035c35bb136cbd7"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.9.2"
   stack_trace:
     dependency: transitive
     description:
@@ -770,6 +842,30 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.0"
+  url_launcher:
+    dependency: "direct main"
+    description:
+      name: url_launcher
+      sha256: e8cc955c97e06df9879140a1fe301f3d493f01b7c62dec7f46834be31d7e9fda
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.3.3"
+  url_launcher_android:
+    dependency: transitive
+    description:
+      name: url_launcher_android
+      sha256: b8073b1e5173d63afe1a18985a75896d72f759d3bc1817eb1ae8d26e8527cceb
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.3.35"
+  url_launcher_ios:
+    dependency: transitive
+    description:
+      name: url_launcher_ios
+      sha256: "8faa1aab294f1ab4040b43660c887b0418d5fa4f0cffef76a484e6aa1092eb4a"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.4.2"
   url_launcher_linux:
     dependency: transitive
     description:
@@ -778,6 +874,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.2.3"
+  url_launcher_macos:
+    dependency: transitive
+    description:
+      name: url_launcher_macos
+      sha256: "5e835a3b869c2d70325349c81c5a45c28e20791265b67b2669da6b08c5cd5201"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.2.6"
   url_launcher_platform_interface:
     dependency: transitive
     description:

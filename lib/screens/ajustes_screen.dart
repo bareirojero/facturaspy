@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import '../services/gemini_service.dart';
+import '../services/respaldo_ui.dart';
 import '../services/settings_service.dart';
+import '../utils/formatters.dart';
+import 'bienvenida_screen.dart';
+import 'categorias_screen.dart';
 
 class AjustesScreen extends StatefulWidget {
   const AjustesScreen({super.key});
@@ -16,6 +20,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
   final _rucTitularCtrl = TextEditingController();
 
   bool _ocultarKey = true;
+  DateTime? _ultimoRespaldo;
   bool _cargando = true;
   bool _probando = false;
 
@@ -31,6 +36,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
     _modelCtrl.text = await s.getModel();
     _nombreTitularCtrl.text = await s.getNombreTitular();
     _rucTitularCtrl.text = await s.getRucTitular();
+    _ultimoRespaldo = await s.getUltimoRespaldo();
 
     if (mounted) {
       setState(() => _cargando = false);
@@ -183,7 +189,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
                     border: OutlineInputBorder(),
                   ),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 20),
                 FilledButton.icon(
                   onPressed: _guardarAjustes,
                   icon: const Icon(Icons.save),
@@ -191,6 +197,58 @@ class _AjustesScreenState extends State<AjustesScreen> {
                     padding: EdgeInsets.symmetric(vertical: 14),
                     child: Text('Guardar Ajustes'),
                   ),
+                ),
+                const Divider(height: 40),
+                Text(
+                  'Datos',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.label_outline),
+                  title: const Text('Categorías'),
+                  subtitle: const Text('Agregar, renombrar, borrar y ordenar'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const CategoriasScreen()),
+                  ),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.backup_outlined),
+                  title: const Text('Exportar copia de seguridad'),
+                  subtitle: Text(
+                    _ultimoRespaldo == null
+                        ? 'Nunca hiciste una copia'
+                        : 'Última: ${AppFormatters.formatFechaCorta(_ultimoRespaldo!.toIso8601String())}',
+                  ),
+                  onTap: () async {
+                    await RespaldoUi.exportar(context);
+                    _cargarAjustes();
+                  },
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.restore),
+                  title: const Text('Restaurar copia de seguridad'),
+                  subtitle: const Text('Reemplaza los datos actuales por los de la copia'),
+                  onTap: () async {
+                    if (await RespaldoUi.restaurar(context)) _cargarAjustes();
+                  },
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.waving_hand_outlined),
+                  title: const Text('Ver la bienvenida de nuevo'),
+                  onTap: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const BienvenidaScreen()),
+                    );
+                    _cargarAjustes();
+                  },
                 ),
               ],
             ),

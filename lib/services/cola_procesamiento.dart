@@ -90,10 +90,14 @@ class ColaProcesamiento extends ChangeNotifier {
   /// responde 429 (límite por minuto), espera y reintenta.
   Future<Factura> _leerConReintentos(Factura f) async {
     final qr = await EkuatiaQr.leerDeImagen(f.imagenPath);
+    final categorias = await DatabaseHelper.instance.getCategorias();
     const esperas = [Duration(seconds: 20), Duration(seconds: 45)];
     for (int intento = 0;; intento++) {
       try {
-        final r = await GeminiService.instance.extraerDatosFactura(f.imagenPath);
+        final r = await GeminiService.instance.extraerDatosFactura(
+          f.imagenPath,
+          categorias: categorias,
+        );
         final leida = f.copyWith(
           fecha: r.fecha ?? f.fecha,
           rucEmisor: r.rucEmisor ?? '',
@@ -110,17 +114,44 @@ class ColaProcesamiento extends ChangeNotifier {
           estado: EstadoFactura.porRevisar,
           limpiarError: true,
         );
-        return _aplicarQr(leida, qr);
+        final conQr = _aplicarQr(leida, qr);
+        return conQr.copyWith(
+          categoria: await _elegirCategoria(conQr, r.categoria, categorias),
+        );
       } on GeminiException catch (e) {
         if (e.statusCode == 429 && intento < esperas.length) {
           await Future.delayed(esperas[intento]);
           continue;
         }
-        return _fallo(f, qr, e.message);
+        final fallida = _fallo(f, qr, e.message);
+        return fallida.copyWith(
+          categoria: await _elegirCategoria(fallida, null, categorias),
+        );
       } catch (e) {
         return _fallo(f, qr, 'Error inesperado: $e');
       }
     }
+  }
+
+  /// Prioridad: 1) la categoría que el usuario le puso antes a ese proveedor,
+  /// 2) la que propone Gemini (si está en la lista), 3) "Otros" o la primera.
+  Future<String> _elegirCategoria(
+    Factura f,
+    String? deGemini,
+    List<String> categorias,
+  ) async {
+    final previa = await DatabaseHelper.instance.ultimaCategoriaDeRuc(
+      f.rucEmisor,
+      excluirId: f.id,
+    );
+    if (previa != null && categorias.contains(previa)) return previa;
+    if (deGemini != null) {
+      for (final c in categorias) {
+        if (c.toLowerCase() == deGemini.toLowerCase()) return c;
+      }
+    }
+    if (categorias.contains('Otros')) return 'Otros';
+    return categorias.isNotEmpty ? categorias.first : '';
   }
 
   /// Los datos del QR son exactos: reemplazan lo que haya leído Gemini.

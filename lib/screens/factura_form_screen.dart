@@ -42,6 +42,7 @@ class _FacturaFormScreenState extends State<FacturaFormScreen> {
 
   late String _condicion;
   late String _categoria;
+  List<String> _categorias = List.of(Factura.categoriasDefecto);
   bool _guardando = false;
 
   @override
@@ -62,9 +63,28 @@ class _FacturaFormScreenState extends State<FacturaFormScreen> {
     _notasCtrl = TextEditingController(text: f.notas);
 
     _condicion = (f.condicion == 'credito') ? 'credito' : 'contado';
-    _categoria = Factura.categoriasDefecto.contains(f.categoria)
-        ? f.categoria
-        : Factura.categoriasDefecto.first;
+    _categoria = f.categoria;
+    _ajustarCategoria();
+    _cargarCategorias();
+  }
+
+  Future<void> _cargarCategorias() async {
+    final lista = await DatabaseHelper.instance.getCategorias();
+    if (!mounted || lista.isEmpty) return;
+    setState(() {
+      _categorias = lista;
+      _ajustarCategoria();
+    });
+  }
+
+  /// Si la factura tiene una categoría que ya no está en la lista (se borró),
+  /// se muestra igual para no perderla. Si no tiene, se propone "Otros".
+  void _ajustarCategoria() {
+    if (_categoria.isEmpty) {
+      _categoria = _categorias.contains('Otros') ? 'Otros' : _categorias.first;
+    } else if (!_categorias.contains(_categoria)) {
+      _categorias = [..._categorias, _categoria];
+    }
   }
 
   @override
@@ -487,14 +507,18 @@ class _FacturaFormScreenState extends State<FacturaFormScreen> {
                 Expanded(
                   flex: 4,
                   child: DropdownButtonFormField<String>(
+                    key: ValueKey('cat-${_categorias.join('|')}'),
                     value: _categoria,
                     isExpanded: true,
                     decoration: const InputDecoration(
                       labelText: 'Categoría',
                       border: OutlineInputBorder(),
                     ),
-                    items: Factura.categoriasDefecto
-                        .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                    items: _categorias
+                        .map((c) => DropdownMenuItem(
+                              value: c,
+                              child: Text(c, overflow: TextOverflow.ellipsis),
+                            ))
                         .toList(),
                     onChanged: (val) {
                       if (val != null) setState(() => _categoria = val);

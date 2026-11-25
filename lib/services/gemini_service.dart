@@ -30,6 +30,7 @@ class GeminiExtractionResult {
   final int iva10;
   final int iva5;
   final int total;
+  final String? categoria;
 
   GeminiExtractionResult({
     this.fecha,
@@ -44,6 +45,7 @@ class GeminiExtractionResult {
     required this.iva10,
     required this.iva5,
     required this.total,
+    this.categoria,
   });
 
   factory GeminiExtractionResult.fromJson(Map<String, dynamic> json) {
@@ -101,6 +103,7 @@ class GeminiExtractionResult {
       iva10: i10,
       iva5: i5,
       total: tot,
+      categoria: toCleanString(json['categoria']),
     );
   }
 }
@@ -162,7 +165,7 @@ Reglas importantes:
 9. Si algún campo no es legible o no aparece en la factura, devolvé null para ese campo. NO inventes ni supongas datos que no estén visibles.
 ''';
 
-  static Map<String, dynamic> get _responseSchema => {
+  static Map<String, dynamic> _responseSchema(List<String> categorias) => {
         'type': 'OBJECT',
         'properties': {
           'fecha': {
@@ -226,6 +229,13 @@ Reglas importantes:
             'nullable': true,
             'description': 'Monto total general de la factura en guaraníes enteros',
           },
+          if (categorias.isNotEmpty)
+            'categoria': {
+              'type': 'STRING',
+              'nullable': true,
+              'enum': categorias,
+              'description': 'Categoría de gasto que mejor describe la compra',
+            },
         },
         'required': [
           'fecha',
@@ -243,7 +253,10 @@ Reglas importantes:
         ],
       };
 
-  Future<GeminiExtractionResult> extraerDatosFactura(String imagePath) async {
+  Future<GeminiExtractionResult> extraerDatosFactura(
+    String imagePath, {
+    List<String> categorias = const [],
+  }) async {
     final apiKey = await SettingsService.instance.getApiKey();
     if (apiKey.isEmpty) {
       throw GeminiException(
@@ -264,7 +277,14 @@ Reglas importantes:
       'contents': [
         {
           'parts': [
-            {'text': _prompt},
+            {
+              'text': categorias.isEmpty
+                  ? _prompt
+                  : '$_prompt'
+                      '10. Categoría: elegí la que mejor describa el gasto según el '
+                      'comercio y los productos, solo entre: ${categorias.join(', ')}. '
+                      'Si ninguna encaja, usá la más general.\n',
+            },
             {
               'inline_data': {
                 'mime_type': 'image/jpeg',
@@ -277,7 +297,7 @@ Reglas importantes:
       'generationConfig': {
         'temperature': 0.1,
         'responseMimeType': 'application/json',
-        'responseSchema': _responseSchema,
+        'responseSchema': _responseSchema(categorias),
       },
     });
 

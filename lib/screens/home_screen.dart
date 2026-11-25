@@ -7,10 +7,13 @@ import '../db/database_helper.dart';
 import '../models/factura.dart';
 import '../services/cola_procesamiento.dart';
 import '../services/pdf_service.dart';
+import '../services/respaldo_ui.dart';
+import '../services/settings_service.dart';
 import '../utils/formatters.dart';
 import 'ajustes_screen.dart';
 import 'factura_form_screen.dart';
 import 'resumen_anual_screen.dart';
+import 'buscar_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -255,11 +258,35 @@ class _HomeScreenState extends State<HomeScreen> {
         month: _selectedMonth,
         facturas: _facturas,
       );
+      await _recordarRespaldo();
     } catch (e) {
       _mostrarMensaje('Error al generar el PDF: $e');
     } finally {
       if (mounted) setState(() => _generandoPdf = false);
     }
+  }
+
+  /// Después del PDF del mes, sugerir una copia si hace más de 25 días.
+  Future<void> _recordarRespaldo() async {
+    final ultimo = await SettingsService.instance.getUltimoRespaldo();
+    if (ultimo != null && DateTime.now().difference(ultimo).inDays < 25) return;
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 10),
+          content: Text(
+            ultimo == null
+                ? 'Todavía no hiciste ninguna copia de seguridad.'
+                : 'Hace más de un mes que no hacés una copia de seguridad.',
+          ),
+          action: SnackBarAction(
+            label: 'Hacer copia',
+            onPressed: () => RespaldoUi.exportar(context),
+          ),
+        ),
+      );
   }
 
   Future<bool?> _confirmarEliminacion(Factura f) {
@@ -550,6 +577,16 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('Facturas PY'),
         actions: [
           IconButton(
+            tooltip: 'Buscar facturas',
+            icon: const Icon(Icons.search),
+            onPressed: () async {
+              await Navigator.of(context).push<bool>(
+                MaterialPageRoute(builder: (_) => const BuscarScreen()),
+              );
+              _cargarFacturas();
+            },
+          ),
+          IconButton(
             tooltip: 'Resumen anual',
             icon: const Icon(Icons.bar_chart),
             onPressed: _abrirResumenAnual,
@@ -568,10 +605,12 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             tooltip: 'Ajustes',
             icon: const Icon(Icons.settings),
-            onPressed: () {
-              Navigator.of(context).push(
+            onPressed: () async {
+              await Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const AjustesScreen()),
               );
+              // Puede haber cambiado algo (restauración, categorías).
+              _cargarFacturas();
             },
           ),
         ],

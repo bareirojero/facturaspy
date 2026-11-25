@@ -13,6 +13,9 @@ class SettingsService {
   static const String _keyNombreTitular = 'titular_nombre';
   static const String _keyRucTitular = 'titular_ruc';
 
+  static const String _keyUltimoRespaldo = 'ultimo_respaldo';
+  static const String _keyBienvenidaVista = 'bienvenida_vista';
+
   static const String defaultModel = 'gemini-flash-latest';
 
   Future<String> getApiKey() async {
@@ -47,5 +50,23 @@ class SettingsService {
 
   Future<void> setRucTitular(String value) async {
     await _storage.write(key: _keyRucTitular, value: value.trim());
+  }
+
+  /// Fecha ISO del último respaldo exportado, o null si nunca se hizo.
+  Future<DateTime?> getUltimoRespaldo() async {
+    final v = await _storage.read(key: _keyUltimoRespaldo);
+    return v == null ? null : DateTime.tryParse(v);
+  }
+
+  Future<void> setUltimoRespaldo(DateTime fecha) async {
+    await _storage.write(key: _keyUltimoRespaldo, value: fecha.toIso8601String());
+  }
+
+  Future<bool> getBienvenidaVista() async {
+    return (await _storage.read(key: _keyBienvenidaVista)) == '1';
+  }
+
+  Future<void> setBienvenidaVista(bool vista) async {
+    await _storage.write(key: _keyBienvenidaVista, value: vista ? '1' : '0');
   }
 }

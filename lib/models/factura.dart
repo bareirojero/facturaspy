@@ -26,6 +26,7 @@ class Factura {
   final String estado; // ver EstadoFactura
   final String? errorExtraccion; // mensaje si Gemini no pudo leerla
 
+  /// Lista inicial; luego el usuario la edita (tabla categorias).
   static const List<String> categoriasDefecto = [
     'Combustible',
     'Alimentación',
@@ -75,7 +76,7 @@ class Factura {
       iva10: 0,
       iva5: 0,
       total: 0,
-      categoria: categoriasDefecto.first,
+      categoria: '', // la decide la cola (historial del proveedor o Gemini)
       notas: '',
       imagenPath: imagenPath,
       creadoEn: ahora.toIso8601String(),
